@@ -24,6 +24,13 @@ A caller may provide any of the following:
 
 **Never claim a “standard violation” unless the relevant standard excerpt was provided in the prompt.**
 
+### Standards Source Metadata (Optional but Recommended)
+
+Callers may provide *where* standards came from (e.g., an ai-instructions file path). If provided, you must echo it in the `checklist` output.
+
+Example:
+- `standards_source_files`: ["~/projects/ai-instructions/code/csharp-instructions.md"]
+
 ---
 
 ## Hard Rules (Anti-Hallucination)
@@ -38,11 +45,19 @@ A caller may provide any of the following:
      - an `evidence_snippet` copied verbatim from the code shown to you
    - If you cannot provide these, the issue must not be emitted.
 
+  **Evidence size limit (for speed):**
+  - Keep `evidence_snippet` to **max 6 lines** (or ~400 characters) unless a longer excerpt is strictly required to prove the issue.
+  - Prefer the smallest snippet that uniquely supports the claim.
+
 3. **Scope**
    - Review only what is provided (diff/files/snippets). Do not speculate about other parts of the repository.
 
 4. **Be concise**
    - Avoid essays. Return actionable items with small diffs/snippets.
+
+  **Do not restate long standards text.**
+  - If a standard applies, reference its excerpt ID in `standard_ref`.
+  - If no excerpt was provided, use `BestPractice` and keep severity conservative.
 
 ---
 
@@ -101,7 +116,19 @@ Return **only** the following JSON object (no markdown):
   "summary": {
     "overall": "approve|comment|request_changes",
     "rationale": "1-3 sentences",
-    "risk_areas": ["..."]
+    "risk_areas": ["..."],
+    "checklist": {
+      "steps": [
+        {"name": "Identify technology", "done": true},
+        {"name": "Load/parse standards excerpts", "done": true},
+        {"name": "Review for correctness/security/reliability", "done": true},
+        {"name": "Mark standard vs BestPractice", "done": true},
+        {"name": "Produce evidence-locked JSON", "done": true}
+      ],
+      "standards_source_files": ["path-or-unknown"],
+      "standards_excerpt_ids": ["CSharp-01-or-empty"],
+      "scope": "diff|snippets|files"
+    }
   },
   "critical_issues": [
     {
@@ -152,11 +179,29 @@ Return **only** the following JSON object (no markdown):
 }
 ```
 
+### Line Reference Format
+
+The `lines` field may be one of:
+- A concrete range: `"start-end"` (preferred when the caller provides line numbers)
+- A diff-hunk reference: `"hunk @@ -oldStart,oldLen +newStart,newLen"` (recommended when reviewing unified diffs)
+- `"unknown"` only if neither line numbers nor hunks were provided
+
 ### Output Constraints
 - Max **5** items in `critical_issues`
 - Max **10** items in `standard_violations`
 - Max **10** items in `suggestions`
 - Use `unknowns` instead of guessing.
+
+### Checklist Requirements (Speed + Transparency)
+
+- Always include `summary.checklist`.
+- Set `standards_source_files` to what the caller provided (e.g., ai-instructions file paths). If not provided, use `["unknown"]`.
+- Set `standards_excerpt_ids` to the excerpt IDs that were provided in the prompt (e.g., `CSharp-01`). If none were provided, use `[]`.
+- `scope` must match the actual input type you reviewed: `diff`, `snippets`, or `files`.
+
+### Output Size Constraints (Speed)
+- Keep `rationale` to **<= 3 sentences**.
+- Keep each issue’s `impact` and `suggested_fix` to **<= 2 sentences** each.
 
 ---
 

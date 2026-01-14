@@ -44,6 +44,19 @@ This skill's job is to:
 
 ---
 
+## Performance Defaults (Speed-Oriented)
+
+Use these defaults unless the user explicitly asks for deeper coverage:
+
+- Prefer **2-4 partitions total** (by technology or subsystem), not per-file.
+- Prefer **diff hunks** over full files.
+- Prefer **small context diffs**: `--unified=1` (or `--unified=0` for very large diffs).
+- Avoid repeating long instruction blocks in every subagent prompt (see “Minimal Worker Contract”).
+
+---
+
+---
+
 ## Step 1: Collect Inputs
 
 From the invoking context (e.g. PR review), gather:
@@ -55,6 +68,21 @@ From the invoking context (e.g. PR review), gather:
 If no code is provided:
 - Abort delegation
 - Return: “No code supplied for review.”
+
+### Optional: Local Git Diff Collection (When Running In A Repo)
+
+If you are running inside a git repo and the user asked for a branch diff:
+
+1) Determine the target base ref (prefer `origin/develop`, else `develop`).
+
+2) Avoid slow/brittle fetches:
+- Prefer `git fetch origin --prune` (do NOT use `git fetch --all` unless necessary; other remotes may be misconfigured and fail).
+
+3) Gather a compact diff + file list:
+- `git diff --name-status <base>...HEAD`
+- `git diff --no-color --unified=1 <base>...HEAD`
+
+4) For huge diffs, split by technology and only include the hunks relevant to each partition.
 
 ---
 
@@ -100,13 +128,19 @@ Load the **entire standards file(s)** once (not excerpts):
 
 Split the review into independent, bounded tasks using one or more of:
 
-- File-based partitioning (recommended)
-- Technology-based partitioning
-- Logical diff chunks
+- Technology-based partitioning (recommended for speed)
+- Subsystem-based partitioning (e.g., “Packager runners”, “Repositories”, “Tests”)
+- File-based partitioning (only when necessary)
 
 Each task must include:
 - Only the code relevant to that task
 - The complete standards file(s) applicable to that technology
+
+### Partitioning Guidance (Fast and Effective)
+
+- Aim for partitions sized so each prompt is roughly “readable in one screen”: typically 1–4 files or a handful of hunks.
+- Merge small, related files into one partition (e.g., all `*.yml` changes in one).
+- Avoid creating more than 4 subagent invocations unless the diff is exceptionally large.
 
 ## Fallback When Workers Are Unavailable
 If you cannot invoke the code-review-skill via tooling in this environment:
@@ -134,7 +168,17 @@ Use the `runSubagent` tool with:
 ```
 You are executing the code-review-skill.
 
-[Insert the complete code-review-skill instructions here, or reference them]
+## Minimal Worker Contract (Do Not Expand)
+
+Hard rules:
+- No invention. Review only what is provided.
+- Evidence required for every issue: `file`, `lines`, and a verbatim `evidence_snippet` from provided code.
+- If a standards excerpt is not provided for a claim, use `standard_ref: "BestPractice"`.
+- Use `unknowns` instead of guessing.
+
+Output:
+- Return JSON only in the code-review-skill schema (summary, critical_issues, standard_violations, suggestions, positive_notes, unknowns).
+- Be concise.
 
 ## Inputs for This Review
 
@@ -147,7 +191,12 @@ You are executing the code-review-skill.
 - Technology: [C#/Angular/TypeScript/SQL Server]
 
 ### Applicable Standards
-[Paste the complete standards file(s) loaded in Step 2]
+[Paste only the standards sections relevant to this partition, OR the complete standards file(s) if short]
+
+### Standards Source Files
+- standards_source_files: ["~/projects/ai-instructions/code/csharp-instructions.md" | "~/projects/ai-instructions/angular/angular-instructions.md" | "~/projects/ai-instructions/database/sqlserver-instructions.md" | "unknown"]
+
+Include this exact `standards_source_files` list so the code-review-skill can echo it in `summary.checklist.standards_source_files`.
 
 ### Additional Context
 [Any PR description, constraints, or risk areas]
@@ -168,7 +217,7 @@ Do not infer beyond the provided inputs.
 
 ⚠️ **Critical**: Each subagent invocation must include:
 - The complete code for that partition (no references to external files)
-- The full standards document(s) applicable to that technology
+- Standards (excerpts or full docs) applicable to that technology
 - Explicit instruction: "Do not infer beyond provided inputs"
 
 If a subagent returns `unknowns` due to missing context, note these for the final report but do not re-invoke with speculation.
