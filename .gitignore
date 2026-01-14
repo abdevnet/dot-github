@@ -1,0 +1,32 @@
+# Ignore everything by default
+*
+
+# Allow these specific files and folders
+!CLAUDE.md
+!agents/
+!skills/
+!commands/
+!settings.json
+
+# Allow contents inside those folders
+!agents/**
+!skills/**
+!commands/**
+# Keep the .gitignore file itself
+!.gitignore
+
+# Ignore system / editor junk inside allowed folders
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# JetBrains IDEs
+.idea/
+
+# Logs and temp files
+*.log
+tmp/
+*.tmp
+*.swp
